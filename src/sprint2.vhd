@@ -52,6 +52,9 @@ port(
 			Gear2_2_I	: in  std_logic;
 			Gear3_1_I	: in  std_logic;
 			Gear3_2_I	: in  std_logic;
+			Gear_Shift_1_I	: in std_logic_vector(2 downto 0);
+			Gear_Shift_2_I	: in std_logic_vector(2 downto 0);
+
 			Test_I		: in  std_logic;  -- Self-test switch
 			Steer_1A_I	: in  std_logic;	-- Steering wheel inputs, these are quadrature encoders
 			Steer_1B_I	: in	std_logic;
@@ -260,6 +263,10 @@ port map(
 		display => display,
 		HCount => HCount,
 		VCount => VCount,
+		
+		Gear_Shift_1=> Gear_Shift_1_I,
+		Gear_Shift_2=> Gear_Shift_2_I,
+		
 		HBlank => HBlank,		
 		H256_s => H256_s,
 		VBlank => VBlank,

@@ -7,6 +7,8 @@ Port to MiSTer by Alan Steremberg
 
 The original Sprint game had a steering wheel with a quadrature encoder. This version implements a converter from the digital joystick inputs.
 
+In this version the gear number is displayed below the track. This is because on MiSTer there is no physical gearshifter control.
+
 # Keyboard inputs :
 ```
    F1          : Coin + Start 1P

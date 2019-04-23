@@ -74,6 +74,7 @@ assign HDMI_ARY = status[1] ? 8'd9  : 8'd3;
 `include "build_id.v"
 localparam CONF_STR = {
 	"A.SPRINT2;;",
+   "F,rom;", // allow loading of alternate ROMs
 	"-;",
 	"O1,Aspect Ratio,Original,Wide;",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",  
@@ -249,31 +250,36 @@ joy2quad steerjoy2quad1
 );
 
 wire gear1,gear2,gear3;
+wire [2:0] gear;
 
 gearshift gearshift1
 (
 	.CLK(clk_12),
-	.reset(m_start1|m_start2),
+	.reset(m_start1|m_start2|btn_start_1|btn_start_2),
 	.gearup(m_gearup),
 	.geardown(m_geardown),
 	
 	.gear1(gear1),
 	.gear2(gear2),
-	.gear3(gear3)
+	.gear3(gear3),
+	.gearout(gear)
 
 );
 wire gear1_1,gear1_2,gear1_3;
+wire [2:0] gearo1;
+
 gearshift gearshift2
 (
 	.CLK(clk_12),
-	.reset(m_start1|m_start2),
+	.reset(m_start1|m_start2|btn_start_1|btn_start_2),
 	
 	.gearup(m_gearup_2),
 	.geardown(m_geardown_2),
 	
 	.gear1(gear1_1),
 	.gear2(gear1_2),
-	.gear3(gear1_3)
+	.gear3(gear1_3),
+	.gearout(gearo1)
 
 );
 
@@ -307,6 +313,9 @@ sprint2 sprint2(
 	.Gear1_2_I(gear1_1),
 	.Gear2_2_I(gear1_2),
 	.Gear3_2_I(gear1_3),
+	.Gear_Shift_1_I(gear),
+	.Gear_Shift_2_I(gearo1),
+
 	.Test_I	(~status[13]),
 	.Steer_1A_I(steer0[1]),
 	.Steer_1B_I(steer0[0]),
