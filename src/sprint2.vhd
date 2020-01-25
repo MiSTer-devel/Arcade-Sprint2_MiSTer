@@ -33,6 +33,7 @@ port(
 			Reset_n		: in	std_logic;	-- Reset button (Active low)
 			VideoW_O		: out std_logic;  -- White video output (680 Ohm)
 			VideoB_O		: out std_logic;	-- Black video output (1.2k)
+			VideoRGB_O	: out std_logic_vector(2 downto 0); --RGB color MOD			
 			Sync_O		: out std_logic;  -- Composite sync output (1.2k)
 			Audio1_O			: out std_logic_vector(6 downto 0);
 			Audio2_O			: out std_logic_vector(6 downto 0);
@@ -427,6 +428,11 @@ port map(
 -- Video mixing	
 VideoB_O <= (not(BlackPF_n and Car2_n and Car3_4_n)) nor CompBlank_s;	
 VideoW_O <= not(WhitePF_n and Car1_n and Car3_4_n);  
+VideoRGB_O <= "111" when WhitePF_n = '0' else 
+			  "100" when BlackPF_n = '0' else 
+			  "010" when Car1_n    = '0' else 
+			  "011" when Car2_n    = '0' else 
+			  "110" when Car3_4_n  = '0' else  "000";
 Sync_O <= CompSync_n_s;
 hs_O<= hsync;
 hblank_O <= HBlank;

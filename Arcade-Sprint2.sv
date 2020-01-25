@@ -93,6 +93,7 @@ localparam CONF_STR = {
 	"OA,Extended Play,extended,normal;",
 	"OBC,Game time,150 Sec,120 Sec,90 Sec,60 Sec;",
 	"OD,Test,Off,On;",
+	"OE,Color,Off,On;",		
 	"-;",
 	"R0,Reset;",
 	"J1,Gas,GearUp,GearDown,Next Track,Start 1P,Start 2P,Coin;",
@@ -299,6 +300,7 @@ gearshift gearshift2
 
 
 wire videowht,videoblk,compositesync,lamp1,lamp2;
+wire [2:0] videorgb;
 
 sprint2 sprint2(
 	.Clk_50_I(CLK_50M),
@@ -310,6 +312,7 @@ sprint2 sprint2(
 
 	.VideoW_O(videowht),
 	.VideoB_O(videoblk),
+	.VideoRGB_O(videorgb),
 
 	.Sync_O(compositesync),
 	.Audio1_O(audio1),
@@ -364,9 +367,9 @@ always @(posedge clk_sys) begin
 		endcase
 end
 
-assign r=vid_mono[7:5];
-assign g=vid_mono[7:5];
-assign b=vid_mono[7:5];
+assign r=status[14] ? {3{videorgb[2]}} : vid_mono[7:5];
+assign g=status[14] ? {3{videorgb[1]}} : vid_mono[7:5];
+assign b=status[14] ? {3{videorgb[0]}} : vid_mono[7:5];
 assign AUDIO_L={audio1,1'b0,8'b00000000};
 assign AUDIO_R={audio2,1'b0,8'b00000000};
 assign AUDIO_S = 0;
