@@ -18,11 +18,15 @@ module emu
 	inout  [45:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
-	output        VGA_CLK,
+	output        CLK_VIDEO,
 
-	//Multiple resolutions are supported using different VGA_CE rates.
+	//Multiple resolutions are supported using different CE_PIXEL rates.
 	//Must be based on CLK_VIDEO
-	output        VGA_CE,
+	output        CE_PIXEL,
+
+	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
+	output [11:0] VIDEO_ARX,
+	output [11:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -31,25 +35,35 @@ module emu
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
 	output        VGA_F1,
+	output [1:0]  VGA_SL,
+	output        VGA_SCALER, // Force VGA scaler
 
-	//Base video clock. Usually equals to CLK_SYS.
-	output        HDMI_CLK,
+	// Use framebuffer from DDRAM (USE_FB=1 in qsf)
+	// FB_FORMAT:
+	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
+	//    [3]   : 0=16bits 565 1=16bits 1555
+	//    [4]   : 0=RGB  1=BGR (for 16/24/32 modes)
+	//
+	// FB_STRIDE either 0 (rounded to 256 bytes) or multiple of 16 bytes.
+	`ifdef USE_FB
+	output        FB_EN,
+	output  [4:0] FB_FORMAT,
+	output [11:0] FB_WIDTH,
+	output [11:0] FB_HEIGHT,
+	output [31:0] FB_BASE,
+	output [13:0] FB_STRIDE,
+	input         FB_VBL,
+	input         FB_LL,
+	output        FB_FORCE_BLANK,
 
-	//Multiple resolutions are supported using different HDMI_CE rates.
-	//Must be based on CLK_VIDEO
-	output        HDMI_CE,
-
-	output  [7:0] HDMI_R,
-	output  [7:0] HDMI_G,
-	output  [7:0] HDMI_B,
-	output        HDMI_HS,
-	output        HDMI_VS,
-	output        HDMI_DE,   // = ~(VBlank | HBlank)
-	output  [1:0] HDMI_SL,   // scanlines fx
-
-	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output  [7:0] HDMI_ARX,
-	output  [7:0] HDMI_ARY,
+	// Palette control for 8bit modes.
+	// Ignored for other video modes.
+	output        FB_PAL_CLK,
+	output  [7:0] FB_PAL_ADDR,
+	output [23:0] FB_PAL_DOUT,
+	input  [23:0] FB_PAL_DIN,
+	output        FB_PAL_WR,
+	`endif
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -59,6 +73,7 @@ module emu
 	output  [1:0] LED_POWER,
 	output  [1:0] LED_DISK,
 
+	input         CLK_AUDIO, // 24.576 MHz
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
 	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
@@ -73,19 +88,23 @@ module emu
 );
 
 assign VGA_F1    = 0;
+assign VGA_SCALER= 0;
 assign USER_OUT  = '1;
 assign LED_USER  = ioctl_download;
 assign LED_DISK  = lamp2;
 assign LED_POWER = lamp1;
 
-assign HDMI_ARX = status[1] ? 8'd16 : 8'd4;
-assign HDMI_ARY = status[1] ? 8'd9  : 8'd3;
+wire [1:0] ar = status[15:14];
+
+assign VIDEO_ARX =  (!ar) ? ( 8'd4) : (ar - 1'd1);
+assign VIDEO_ARY =  (!ar) ? ( 8'd3) : 12'd0;
+
 
 
 `include "build_id.v"
 localparam CONF_STR = {
 	"A.SPRINT2;;",
-	"H0O1,Aspect Ratio,Original,Wide;",
+	"H0OEF,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",  
 	"-;",
 	"O8,Oil Slicks,On,Off;",
@@ -93,7 +112,7 @@ localparam CONF_STR = {
 	"OA,Extended Play,extended,normal;",
 	"OBC,Game time,150 Sec,120 Sec,90 Sec,60 Sec;",
 	"OD,Test,Off,On;",
-	"OE,Color,Off,On;",		
+	"OG,Color,Off,On;",		
 	"-;",
 	"R0,Reset;",
 	"J1,Gas,GearUp,GearDown,Next Track,Start 1P,Start 2P,Coin;",
@@ -142,80 +161,28 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3) )) hps_io
 	
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
-	.ps2_key(ps2_key)
 );
 
 
 
-wire       pressed = ps2_key[9];
-wire [8:0] code    = ps2_key[8:0];
-always @(posedge clk_sys) begin
-	reg old_state;
-	old_state <= ps2_key[10];
-	
-	if(old_state != ps2_key[10]) begin
-		casex(code)
-			'hX6B: btn_left        <= pressed; // left
-			'hX74: btn_right       <= pressed; // right
-			'h014: btn_gas         <= pressed; // ctrl
-			'h011: btn_gearup      <= pressed; // Lalt
-			'h029: btn_geardown    <= pressed; // space
-			'h012: btn_nexttrack   <= pressed; // Lshft
-
-			'h005: btn_start_1     <= pressed; // F1
-			'h006: btn_start_2     <= pressed; // F2
-			// JPAC/IPAC/MAME Style Codes
-			'h016: btn_start_1     <= pressed; // 1
-			'h01E: btn_start_2     <= pressed; // 2
-			'h02E: btn_coin_1      <= pressed; // 5
-			'h036: btn_coin_2      <= pressed; // 6
-			'h023: btn_left_2      <= pressed; // D
-			'h034: btn_right_2     <= pressed; // G
-			'h01C: btn_gas_2       <= pressed; // A
-			'h01B: btn_gearup_2    <= pressed; // S
-			'h015: btn_geardown_2  <= pressed; // Q
-			'h01D: btn_nexttrack   <= pressed; // W
-		endcase
-	end
-end
-
-reg btn_right = 0;
-reg btn_left  = 0;
-reg btn_gas  = 0;
-
-reg btn_start_1=0;
-reg btn_start_2=0;
-reg btn_coin_1=0;
-reg btn_coin_2=0;
-reg btn_left_2=0;
-reg btn_right_2=0;
-reg btn_gearup=0;
-reg btn_geardown=0;
-
-reg btn_gas_2=0;
-reg btn_gearup_2=0;
-reg btn_geardown_2=0;
-reg btn_nexttrack=0;
 
 
+wire m_left	=  joy0[1];
+wire m_right	=  joy0[0];
+wire m_gas	=  joy0[4];
+wire m_gearup	=  joy0[5];
+wire m_geardown	=  joy0[6];
 
+wire m_left_2   =  joy1[1];
+wire m_right_2  =  joy1[0];
+wire m_gas_2 	=  joy1[4];
+wire m_gearup_2	=  joy1[5];
+wire m_geardown_2	=  joy1[6];
+wire m_next_track	=  joy0[7];
 
-wire m_left	=  btn_left  	| joy0[1];
-wire m_right	=  btn_right 	| joy0[0];
-wire m_gas	=  btn_gas	| joy0[4];
-wire m_gearup	=  btn_gearup 	|joy0[5];
-wire m_geardown	=  btn_geardown | joy0[6];
-
-wire m_left_2   	=	joy1[1] | btn_left_2;
-wire m_right_2  	=  joy1[0]| btn_right_2;
-wire m_gas_2 		=  joy1[4]| btn_gas_2;
-wire m_gearup_2	=  joy1[5]| btn_gearup_2;
-wire m_geardown_2	=  joy1[6]| btn_geardown_2;
-wire m_next_track	=  joy0[7]|joy1[7]|btn_nexttrack;
-
-wire m_start1 = btn_start_1 | joy0[8] | joy1[8];
-wire m_start2 = btn_start_2 | joy0[9] | joy1[9];
-wire m_coin   = btn_coin_1 | joy0[10] | joy1[10];
+wire m_start1 =  joy0[8] | joy1[8];
+wire m_start2 =  joy0[9] | joy1[9];
+wire m_coin   =  joy0[10] | joy1[10];
 
 
 
@@ -367,9 +334,9 @@ always @(posedge clk_sys) begin
 		endcase
 end
 
-assign r=status[14] ? {3{videorgb[2]}} : vid_mono[7:5];
-assign g=status[14] ? {3{videorgb[1]}} : vid_mono[7:5];
-assign b=status[14] ? {3{videorgb[0]}} : vid_mono[7:5];
+assign r=status[16] ? {3{videorgb[2]}} : vid_mono[7:5];
+assign g=status[16] ? {3{videorgb[1]}} : vid_mono[7:5];
+assign b=status[16] ? {3{videorgb[0]}} : vid_mono[7:5];
 assign AUDIO_L={audio1,1'b0,8'b00000000};
 assign AUDIO_R={audio2,1'b0,8'b00000000};
 assign AUDIO_S = 0;
@@ -387,7 +354,7 @@ always @(posedge clk_48) begin
         ce_pix <= !div;
 end
 
-arcade_video #(320,320,9) arcade_video
+arcade_video #(320,9) arcade_video
 (
         .*,
 
@@ -398,8 +365,6 @@ arcade_video #(320,320,9) arcade_video
         .VBlank(vblank),
         .HSync(hs),
         .VSync(vs),
-	.no_rotate(1),
-	.rotate_ccw(0),
 
         .fx(status[5:3])
 );
