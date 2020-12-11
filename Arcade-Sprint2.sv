@@ -160,7 +160,7 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3) )) hps_io
 	.ioctl_dout(ioctl_data),
 	
 	.joystick_0(joystick_0),
-	.joystick_1(joystick_1),
+	.joystick_1(joystick_1)
 );
 
 
@@ -285,7 +285,7 @@ sprint2 sprint2(
 	.Audio1_O(audio1),
 	.Audio2_O(audio2),
 	.Coin1_I(~(m_coin)),
-	.Coin2_I(~(btn_coin_2)),
+	.Coin2_I(1'b1),
 	.Start1_I(~(m_start1)),
 	.Start2_I(~(m_start2)),
 	.Trak_Sel_I(~m_next_track),

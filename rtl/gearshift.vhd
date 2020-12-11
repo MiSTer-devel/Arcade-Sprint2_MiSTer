@@ -32,7 +32,7 @@ begin
 
 gearout<=gear;
 
-process (clk)
+process (clk, gear)
 begin
 
   if rising_edge(clk) then

@@ -105,7 +105,7 @@ P3_6 <= (HBlank or VBlank);
 
 --char_addr <= display(5 downto 0) & V4 & V2 & V1;
 
-process(Hcount,Vcount)
+process(Hcount,Vcount,Gear_Shift_2,Gear_Shift_1,V2,V4,V1,display)
 begin
  -- this is the left side of the screen for the gear shift
  -- this is the right side of the screen for the gear shift
